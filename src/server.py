@@ -14,6 +14,7 @@ sock = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
 sock.bind((args.hostname, args.port))
 
 INITIAL_RTO = 1.0
+ALPHA = 0.125  # Facteur de lissage pour le SRTT
 
 while True:
     sock.settimeout(None)
@@ -41,9 +42,10 @@ while True:
 
     packets_in_flight = {}
     rto = INITIAL_RTO
+    srtt = INITIAL_RTO
     finished_reading = False
 
-    sock.settimeout(0.01)
+    sock.settimeout(0.05)
 
     while not finished_reading or packets_in_flight:
         while not finished_reading and len(packets_in_flight) < window_size:
@@ -52,12 +54,13 @@ while True:
                 finished_reading = True
                 break
             
-            t_send = time.monotonic()
-            pkt = srtp.create_packet(1, 63, next_seq, int(t_send * 1000) & 0xFFFFFFFF, data_chunk)
+            t_send_ms = int(time.monotonic() * 1000) & 0xFFFFFFFF
+            pkt = srtp.create_packet(1, 63, next_seq, t_send_ms, data_chunk)
             
             packets_in_flight[next_seq] = {
                 'data': pkt,
-                't_send': t_send,
+                't_send_real': time.monotonic(),
+                't_timestamp': t_send_ms,
                 'retransmitted': False
             }
             
@@ -71,9 +74,15 @@ while True:
             if ack_paquet and (ack_paquet['type'] == 2 or ack_paquet['type'] == 3):
                 ack_num = ack_paquet['seqnum']
                 window_size = max(1, ack_paquet['window'])
+                ts_echo = ack_paquet['timestamp']
+                now_ms = int(time.monotonic() * 1000) & 0xFFFFFFFF
+                rtt_measured = (now_ms - ts_echo) / 1000.0
+                
+                if 0 < rtt_measured < 5.0:
+                    srtt = (1 - ALPHA) * srtt + ALPHA * rtt_measured
+                    rto = max(0.2, srtt * 1.5)
 
                 to_remove = [s for s in packets_in_flight if s < ack_num] 
-
                 if ack_num < base:
                     to_remove = [s for s in packets_in_flight if s >= base or s < ack_num]
                 
@@ -87,8 +96,8 @@ while True:
 
         now = time.monotonic()
         for s, p_info in packets_in_flight.items():
-            if now - p_info['t_send'] > rto:
-                p_info['t_send'] = now
+            if now - p_info['t_send_real'] > rto:
+                p_info['t_send_real'] = now
                 p_info['retransmitted'] = True
                 sock.sendto(p_info['data'], client_addr)
                 rto = min(60.0, rto * 2.0)
