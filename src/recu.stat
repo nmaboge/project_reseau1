@@ -1,0 +1,14 @@
+commit c8f9efb8e405fc94ffdf9670f157839d8b93df94
+Author: Pablo <pablo@wifi-student19-nat-inside-299.sri.ucl.ac.be>
+Date:   Mon Mar 23 15:48:20 2026 +0100
+
+    MVP
+
+ gitlog.stat                          |   0
+ src/__pycache__/srtp.cpython-314.pyc | Bin 0 -> 2571 bytes
+ src/client.py                        |  58 ++++++++++++++++++++++++++++
+ src/fichier_test.txt                 |   1 +
+ src/resultat.txt                     |   1 +
+ src/server.py                        |  72 ++++++++++++++++++++++++++++++++++
+ src/srtp.py                          |  73 +++++++++++++++++++++++++++++++++++
+ 7 files changed, 205 insertions(+)

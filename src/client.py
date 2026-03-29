@@ -9,7 +9,7 @@ parser.add_argument("--save", default="llm.model")
 args = parser.parse_args()
 url = args.servername.replace("http://", "")
 ip_port, fichier_demande = url.split("/", 1)
-ip = ip_port.rsplit(":", 1)[0]
+ip = ip = ip_port.rsplit(":", 1)[0].replace("[", "").replace("]", "")
 port = int(ip_port.rsplit(":", 1)[1])
 server_addr = (ip, port)
 
@@ -22,7 +22,7 @@ paquet_demande = srtp.create_packet(1, 32, 0, ts_initial, requete_texte)
 sock.sendto(paquet_demande, server_addr)
 
 f = open(args.save, "wb")
-wanted = 1
+wanted = 0
 buffer_reception = {} 
 MAX_WINDOW = 32
 
@@ -34,8 +34,8 @@ while True:
         if paquet is None:
             continue
 
-        if paquet['length'] == 0:
-            ack_fin = srtp.create_packet(2, 0, (paquet['seqnum'] + 1) % 2048, 0)
+        if paquet['length'] == 0 and paquet['seqnum'] == wanted:
+            ack_fin = srtp.create_packet(2, 0, (paquet['seqnum'] + 1) % 2048, paquet['timestamp'])
             sock.sendto(ack_fin, addr)
             break
 
@@ -56,7 +56,7 @@ while True:
         sock.sendto(ack, addr)
 
     except socket.timeout:
-        if wanted == 1:
+        if wanted == 0:
             sock.sendto(paquet_demande, server_addr)
         else:
             if 'ack' in locals():

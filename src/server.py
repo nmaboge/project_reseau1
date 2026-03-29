@@ -14,7 +14,7 @@ sock = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
 sock.bind((args.hostname, args.port))
 
 INITIAL_RTO = 1.0
-ALPHA = 0.125  # Facteur de lissage pour le SRTT
+ALPHA = 0.125
 
 while True:
     sock.settimeout(None)
@@ -31,14 +31,14 @@ while True:
     path = os.path.join(args.root, filename)
 
     if not os.path.exists(path):
-        paquet_vide = srtp.create_packet(1, 63, 1, 0, b"")
+        paquet_vide = srtp.create_packet(1, 0, 0, 0, b"")
         sock.sendto(paquet_vide, client_addr)
         continue
 
     f = open(path, "rb")
     window_size = 1
-    base = 1
-    next_seq = 1
+    base = 0
+    next_seq = 0
 
     packets_in_flight = {}
     rto = INITIAL_RTO
@@ -55,7 +55,7 @@ while True:
                 break
             
             t_send_ms = int(time.monotonic() * 1000) & 0xFFFFFFFF
-            pkt = srtp.create_packet(1, 63, next_seq, t_send_ms, data_chunk)
+            pkt = srtp.create_packet(1, 0, next_seq, t_send_ms, data_chunk)
             
             packets_in_flight[next_seq] = {
                 'data': pkt,
@@ -73,7 +73,7 @@ while True:
             
             if ack_paquet and (ack_paquet['type'] == 2 or ack_paquet['type'] == 3):
                 ack_num = ack_paquet['seqnum']
-                window_size = max(1, ack_paquet['window'])
+                window_size = ack_paquet['window']
                 ts_echo = ack_paquet['timestamp']
                 now_ms = int(time.monotonic() * 1000) & 0xFFFFFFFF
                 rtt_measured = (now_ms - ts_echo) / 1000.0
@@ -103,5 +103,5 @@ while True:
                 rto = min(60.0, rto * 2.0)
 
     f.close()
-    paquet_fin = srtp.create_packet(1, 63, next_seq, 0, b"")
+    paquet_fin = srtp.create_packet(1, 0, next_seq, 0, b"")
     sock.sendto(paquet_fin, client_addr)

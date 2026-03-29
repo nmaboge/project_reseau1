@@ -15,8 +15,8 @@ def create_packet(ptype, window, seqnum, timestamp, payload=b""):
     
     data_32bits = (ptype << 30) | (window << 24) | (length << 11) | seqnum
     
-    crc0 = struct.pack('!III', data_32bits, timestamp, 0)
-    crc1 = zlib.crc32(crc0) & 0xffffffff
+    h_hash = struct.pack('!II', data_32bits, timestamp)
+    crc1 = zlib.crc32(h_hash) & 0xffffffff
     
     h = struct.pack('!III', data_32bits, timestamp, crc1)
     packet = bytearray(h + payload)
@@ -34,8 +34,9 @@ def parse_packet(packet_bytes):
         
     data_32bits, timestamp, crc1_recevied = struct.unpack('!III', packet_bytes[:12])
     
-    crc0 = struct.pack('!III', data_32bits, timestamp, 0)
-    check_crc1 = zlib.crc32(crc0) & 0xffffffff
+    h_hash = struct.pack('!II', data_32bits, timestamp) 
+    check_crc1 = zlib.crc32(h_hash) & 0xffffffff
+    
     if crc1_recevied != check_crc1:
         return None
         
